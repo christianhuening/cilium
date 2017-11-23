@@ -296,6 +296,7 @@ var badLogMessages = map[string][]string{
 	uninitializedRegen:  nil,
 	unstableStat:        nil,
 	removeTransientRule: nil,
+	"DATA RACE":         nil,
 }
 
 var ciliumCLICommands = map[string]string{
