@@ -157,7 +157,6 @@ func (s ServiceFlags) UInt8() uint8 {
 }
 
 const (
-	NONE = L4Type("NONE")
 	// TCP type.
 	TCP = L4Type("TCP")
 	// UDP type.
@@ -272,6 +271,17 @@ func NewL4Type(name string) (L4Type, error) {
 	}
 }
 
+func NewL4TypeFromNumber(proto uint8) (L4Type, error) {
+	switch proto {
+	case 6:
+		return TCP, nil
+	case 17:
+		return UDP, nil
+	default:
+		return "", fmt.Errorf("unkown L4 protocol")
+	}
+}
+
 // L4Addr is an abstraction for the backend port with a L4Type, usually tcp or udp, and
 // the Port number.
 type L4Addr struct {
@@ -333,16 +343,12 @@ func NewL3n4AddrFromModel(base *models.FrontendAddress) (*L3n4Addr, error) {
 		return nil, fmt.Errorf("missing IP address")
 	}
 
-	proto := NONE
-	if base.Protocol != "" {
-		p, err := NewL4Type(base.Protocol)
-		if err != nil {
-			return nil, err
-		}
-		proto = p
+	p, err := NewL4Type(base.Protocol)
+	if err != nil {
+		return nil, err
 	}
 
-	l4addr := NewL4Addr(proto, base.Port)
+	l4addr := NewL4Addr(p, base.Port)
 	ip := net.ParseIP(base.IP)
 	if ip == nil {
 		return nil, fmt.Errorf("invalid IP address \"%s\"", base.IP)
@@ -376,8 +382,12 @@ func NewBackendFromBackendModel(base *models.BackendAddress) (*Backend, error) {
 		return nil, fmt.Errorf("missing IP address")
 	}
 
-	// FIXME: Should this be NONE ?
-	l4addr := NewL4Addr(NONE, base.Port)
+	p, err := NewL4Type(base.Protocol)
+	if err != nil {
+		return nil, err
+	}
+
+	l4addr := NewL4Addr(p, base.Port)
 	ip := net.ParseIP(*base.IP)
 	if ip == nil {
 		return nil, fmt.Errorf("invalid IP address \"%s\"", *base.IP)
@@ -391,8 +401,11 @@ func NewL3n4AddrFromBackendModel(base *models.BackendAddress) (*L3n4Addr, error)
 		return nil, fmt.Errorf("missing IP address")
 	}
 
-	// FIXME: Should this be NONE ?
-	l4addr := NewL4Addr(NONE, base.Port)
+	p, err := NewL4Type(base.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	l4addr := NewL4Addr(p, base.Port)
 	ip := net.ParseIP(*base.IP)
 	if ip == nil {
 		return nil, fmt.Errorf("invalid IP address \"%s\"", *base.IP)
@@ -475,14 +488,7 @@ func (a *L3n4Addr) DeepCopy() *L3n4Addr {
 
 // Hash calculates L3n4Addr's internal SHA256Sum.
 func (a L3n4Addr) Hash() string {
-	// FIXME: Remove Protocol's omission once we care about protocols.
-	protoBak := a.Protocol
-	a.Protocol = ""
-	defer func() {
-		a.Protocol = protoBak
-	}()
-
-	str := []byte(fmt.Sprintf("%+v", a))
+	str := []byte(fmt.Sprintf("%s", a.StringWithProtocol()))
 	return fmt.Sprintf("%x", sha512.Sum512_256(str))
 }
 
